@@ -1,6 +1,9 @@
 # RPChess
 Welcome to **RPChess**: A variation of Chess based on turn-based combat!
 
+## RUNNING
+To run the game, download the repository and run the main method of `app.java`. I might make a separate downloadable executable of the game eventually!
+
 ## THE RULES
 The game concludes when the enemy's king is killed - simple enough. 
 

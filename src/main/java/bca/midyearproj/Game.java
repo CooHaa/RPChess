@@ -2,11 +2,6 @@ package bca.midyearproj;
 
 import java.io.File;
 
-import bca.midyearproj.Pieces.Pawn;
-import bca.midyearproj.Pieces.Piece;
-import javafx.event.EventHandler;
-import javafx.event.EventTarget;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 
 /**

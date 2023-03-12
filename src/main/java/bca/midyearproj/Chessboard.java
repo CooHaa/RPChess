@@ -41,6 +41,7 @@ public class Chessboard extends VBox {
     private Piece selectedPiece;
     private boolean player1Turn;
     private boolean moveTurn;
+    private boolean game;
 
     // Visual board
     private GridPane board;
@@ -57,6 +58,7 @@ public class Chessboard extends VBox {
         selectedPiece = null;
         player1Turn = true;
         moveTurn = true;
+        game = true;
 
         board = new GridPane();
 
@@ -224,8 +226,9 @@ public class Chessboard extends VBox {
         if (piece instanceof King) {
             setOnMouseClicked(null);
             King king = (King) piece;
-            String player = king.isLight() ? "1" : "2";
-            System.out.println("King killed - Player " + player + " wins!");
+            String player = king.isLight() ? "White" : "Black";
+            sideui.getFeed().printAction("The " + king.toString() + " has been slain. " + player + " wins!", player1Turn);
+            game = false;
         }
     }
     
@@ -251,322 +254,343 @@ public class Chessboard extends VBox {
 
             EventTarget target = event.getTarget();
 
-            // MOVE TURN
-            if (moveTurn()) {
+            if (game) {
+                // MOVE TURN
+                if (moveTurn()) {
 
-                System.out.println("m1");
-                
-                // Handle selecting a new piece
-                if (getSelectedPiece() == null) {
+                    System.out.println("m1");
+                    
+                    // Handle selecting a new piece
+                    if (getSelectedPiece() == null) {
 
-                    // If the click is on a square
-                    if (target instanceof Square) {
-                        Square square = (Square) target;
+                        // If the click is on a square
+                        if (target instanceof Square) {
+                            Square square = (Square) target;
 
-                        // Run select process only if the square has a piece and piece is player color
-                        if (square.hasPiece() && (square.getPiece().isLight() == playerTurn())) {
-                            Piece piece = square.getPiece();
-                            setSelectedPiece(piece);
-                            sideui.getMenu().updateMenu(piece);
-                            for (Square moveSpace : piece.getPossibleMoves(getInternalBoard())) moveSpace.selectColorChange();
-                            for (Square attackSpace : piece.getAmbushMoves(getInternalBoard())) attackSpace.ambushColorChange();
+                            // Run select process only if the square has a piece and piece is player color
+                            if (square.hasPiece() && (square.getPiece().isLight() == playerTurn())) {
+                                Piece piece = square.getPiece();
+                                setSelectedPiece(piece);
+                                sideui.getMenu().updateMenu(piece);
+                                for (Square moveSpace : piece.getPossibleMoves(getInternalBoard())) moveSpace.selectColorChange();
+                                for (Square attackSpace : piece.getAmbushMoves(getInternalBoard())) attackSpace.ambushColorChange();
+                            }
                         }
+
+                        // If the click is on a piece
+                        else if (target instanceof Piece) {
+                            Piece piece = (Piece) target;
+                            // Run select process only if the piece is player color
+                            if (piece.isLight() == playerTurn()) {
+                                setSelectedPiece(piece);
+                                sideui.getMenu().updateMenu(piece);
+                                for (Square moveSpace : piece.getPossibleMoves(getInternalBoard())) moveSpace.selectColorChange();
+                                for (Square attackSpace : piece.getAmbushMoves(getInternalBoard())) attackSpace.ambushColorChange();
+                            }
+                        }
+
+
                     }
 
-                    // If the click is on a piece
-                    else if (target instanceof Piece) {
-                        Piece piece = (Piece) target;
-                        // Run select process only if the piece is player color
-                        if (piece.isLight() == playerTurn()) {
-                            setSelectedPiece(piece);
-                            sideui.getMenu().updateMenu(piece);
-                            for (Square moveSpace : piece.getPossibleMoves(getInternalBoard())) moveSpace.selectColorChange();
-                            for (Square attackSpace : piece.getAmbushMoves(getInternalBoard())) attackSpace.ambushColorChange();
-                        }
-                    }
+                    // Handle second action after selecting a piece (selectedPiece is not null)
+                    else {
 
+                        System.out.println("m2");
 
-                }
-
-                // Handle second action after selecting a piece (selectedPiece is not null)
-                else {
-
-                    System.out.println("m2");
-
-                    // If square is clicked
-                    if (target instanceof Square) {
-                        Square destination = (Square) target;
-                        Square origin = getSelectedPiece().getSpace();
-                        // If the same space is picked, deselect all
-                        if (destination == origin) {
-                            deselectAll();
-                            sideui.getMenu().revertMenu();
-                        }
-
-                        else if (origin.getPiece().getAmbushMoves(internalBoard).contains(destination)) {
-                            destination.getPiece().takeDamage(5);
-                            sideui.getFeed().printAction(getSelectedPiece().toString() + " ambushes " + destination.getPiece().toString() + ", dealing 5 damage.", player1Turn);
-
-                            deselectAll();
-                            switchTurn();
-                            showSkipButton();
-                            sideui.getMenu().revertMenu();
-                        }
-
-                        // Only run routine if the destination is part of the possible moves, and doesn't have a piece on it
-                        else if (!destination.hasPiece() && origin.getPiece().getPossibleMoves(internalBoard).contains(destination)) {
-                            origin.releasePiece();
-                            destination.holdPiece(getSelectedPiece());
-                            sideui.getFeed().printAction(getSelectedPiece().toString() + " moves to " + destination.toString() + ".", player1Turn);
-
-                            // If placed piece was a pawn, prevent two space movements after this
-                            if (getSelectedPiece() instanceof Pawn) {
-                                ((Pawn) getSelectedPiece()).firstMove();
+                        // If square is clicked
+                        if (target instanceof Square) {
+                            Square destination = (Square) target;
+                            Square origin = getSelectedPiece().getSpace();
+                            // If the same space is picked, deselect all
+                            if (destination == origin) {
+                                deselectAll();
+                                sideui.getMenu().revertMenu();
                             }
 
-                            deselectAll();
-                            switchTurn();
-                            showSkipButton();
-                            sideui.getMenu().revertMenu();
-                        }
-                    }
+                            else if (origin.getPiece().getAmbushMoves(internalBoard).contains(destination)) {
+                                destination.getPiece().takeDamage(5);
+                                sideui.getFeed().printAction(getSelectedPiece().toString() + " ambushes " + destination.getPiece().toString() + ", dealing 5 damage.", player1Turn);
 
-                    // If piece is clicked
-                    else if (target instanceof Piece) {
-                        Piece targetPiece = (Piece) target;
-                        Square origin = getSelectedPiece().getSpace();
-                        Square destination = (Square) targetPiece.getParent();
-                        // Run deselect routine if the piece is the same piece as the selected piece
-                        if (targetPiece == getSelectedPiece()) {
-                            deselectAll();
-                            sideui.getMenu().revertMenu();
-                        }
-                        
-                        // If targetspace is part of the ambush spaces, deal ambush damage
-                        else if (origin.getPiece().getAmbushMoves(internalBoard).contains(destination)) {
-                            targetPiece.takeDamage(5);
-                            sideui.getFeed().printAction(getSelectedPiece().toString() + " ambushes " + targetPiece.toString() + ", dealing 5 damage.", player1Turn);
+                                deselectAll();
+                                switchTurn();
+                                showSkipButton();
+                                sideui.getMenu().revertMenu();
+                            }
 
-                            deselectAll();
-                            switchTurn();
-                            showSkipButton();
-                            sideui.getMenu().revertMenu();
-                        }
-                    }
-                }
+                            // Only run routine if the destination is part of the possible moves, and doesn't have a piece on it
+                            else if (!destination.hasPiece() && origin.getPiece().getPossibleMoves(internalBoard).contains(destination)) {
+                                origin.releasePiece();
+                                destination.holdPiece(getSelectedPiece());
+                                sideui.getFeed().printAction(getSelectedPiece().toString() + " moves to " + destination.toString() + ".", player1Turn);
 
-            }
-
-            // ATTACK TURN
-            else {
-
-                System.out.println("a1");
-
-                // Handle selecting a new piece
-                if (getSelectedPiece() == null) {
-
-                    System.out.println("null piece");
-                    
-                    // If the click is on a square
-                    if (target instanceof Square) {
-                        Square square = (Square) target;
-
-                        // Only run select process if the square has a piece of the current player's color
-                        if (square.hasPiece() && (square.getPiece().isLight() == playerTurn())) {
-                            Piece piece = square.getPiece();
-                            setSelectedPiece(piece);
-                            sideui.getMenu().updateMenu(piece);
-                            square.selectColorChange();
-                        }
-                    }
-
-                    // If the click is on a piece
-                    else if (target instanceof Piece) {
-                        Piece piece = (Piece) target;
-                        Square square = piece.getSpace();
-
-                        // Only run select process if the piece is the player turn color
-                        if (piece.isLight() == playerTurn()) {
-                            setSelectedPiece(piece);
-                            sideui.getMenu().updateMenu(piece);
-                            square.selectColorChange();
-                        }
-                    }
-                }
-
-                // Handle second action after selecting piece
-                else {
-
-                    System.out.println("a2");
-                    
-                    // If square is clicked
-                    if (target instanceof Square) {
-
-                        System.out.println("s0");
-
-                        Square destination = (Square) target;
-                        Square origin = getSelectedPiece().getSpace();
-                        // If the same space is picked, deselect all
-                        if (destination == origin) {
-                            deselectAll();
-                            sideui.getMenu().revertMenu();
-                        }
-
-                        // Attack handler
-                        if (sideui.getMenu().getSelectedSkill() instanceof Attack) {
-                            Attack attack = (Attack) sideui.getMenu().getSelectedSkill();
-                            // Aoe attack handler
-                            if (attack.aoe()) {
-
-                                // Check if it can be used (only activate if there's an enemy in the area)
-                                boolean canActivate = false;
-                                for (Square space : attack.runAlgorithm(origin, internalBoard)) {
-                                    if (space.hasPiece() && (space.getPiece().isLight() != playerTurn())) canActivate = true;
+                                // If placed piece was a pawn, prevent two space movements after this
+                                if (getSelectedPiece() instanceof Pawn) {
+                                    ((Pawn) getSelectedPiece()).firstMove();
                                 }
 
-                                if (canActivate) {
-                                    // If a highlighted space is clicked
-                                    if (attack.runAlgorithm(origin, internalBoard).contains(destination)) {
-                                        sideui.getFeed().printAction(getSelectedPiece().toString() + " uses " + attack.toString() + ", dealing " + attack.getVal() + " to every enemy in the area!", player1Turn);
-                                        // Iterate through every square in the attack algorithm
-                                        for (Square space : attack.runAlgorithm(origin, internalBoard)) {
-                                            if (space.hasPiece() && (space.getPiece().isLight() != playerTurn())) {
-                                                Piece targetPiece = space.getPiece(); 
-                                                targetPiece.takeDamage(attack.getVal());
-                                                if (targetPiece.getCurrentHP() <= 0) {
-                                                    killPiece(targetPiece);
-                                                    sideui.getFeed().printAction(targetPiece.toString() + " has been slain.", player1Turn);
+                                deselectAll();
+                                switchTurn();
+                                showSkipButton();
+                                sideui.getMenu().revertMenu();
+                            }
+                        }
+
+                        // If piece is clicked
+                        else if (target instanceof Piece) {
+                            Piece targetPiece = (Piece) target;
+                            Square origin = getSelectedPiece().getSpace();
+                            Square destination = (Square) targetPiece.getParent();
+                            // Run deselect routine if the piece is the same piece as the selected piece
+                            if (targetPiece == getSelectedPiece()) {
+                                deselectAll();
+                                sideui.getMenu().revertMenu();
+                            }
+                            
+                            // If targetspace is part of the ambush spaces, deal ambush damage
+                            else if (origin.getPiece().getAmbushMoves(internalBoard).contains(destination)) {
+                                targetPiece.takeDamage(5);
+                                sideui.getFeed().printAction(getSelectedPiece().toString() + " ambushes " + targetPiece.toString() + ", dealing 5 damage.", player1Turn);
+
+                                deselectAll();
+                                switchTurn();
+                                showSkipButton();
+                                sideui.getMenu().revertMenu();
+                            }
+                        }
+                    }
+
+                }
+
+                // ATTACK TURN
+                else {
+
+                    System.out.println("a1");
+
+                    // Handle selecting a new piece
+                    if (getSelectedPiece() == null) {
+
+                        System.out.println("null piece");
+                        
+                        // If the click is on a square
+                        if (target instanceof Square) {
+                            Square square = (Square) target;
+
+                            // Only run select process if the square has a piece of the current player's color
+                            if (square.hasPiece() && (square.getPiece().isLight() == playerTurn())) {
+                                Piece piece = square.getPiece();
+                                setSelectedPiece(piece);
+                                sideui.getMenu().updateMenu(piece);
+                                square.selectColorChange();
+                            }
+                        }
+
+                        // If the click is on a piece
+                        else if (target instanceof Piece) {
+                            Piece piece = (Piece) target;
+                            Square square = piece.getSpace();
+
+                            // Only run select process if the piece is the player turn color
+                            if (piece.isLight() == playerTurn()) {
+                                setSelectedPiece(piece);
+                                sideui.getMenu().updateMenu(piece);
+                                square.selectColorChange();
+                            }
+                        }
+                    }
+
+                    // Handle second action after selecting piece
+                    else {
+
+                        System.out.println("a2");
+                        
+                        // If square is clicked
+                        if (target instanceof Square) {
+
+                            System.out.println("s0");
+
+                            Square destination = (Square) target;
+                            Square origin = getSelectedPiece().getSpace();
+                            // If the same space is picked, deselect all
+                            if (destination == origin) {
+                                deselectAll();
+                                sideui.getMenu().revertMenu();
+                            }
+
+                            // Attack handler
+                            if (sideui.getMenu().getSelectedSkill() instanceof Attack) {
+                                Attack attack = (Attack) sideui.getMenu().getSelectedSkill();
+                                // Aoe attack handler
+                                if (attack.aoe()) {
+
+                                    // Check if it can be used (only activate if there's an enemy in the area)
+                                    boolean canActivate = false;
+                                    for (Square space : attack.runAlgorithm(origin, internalBoard)) {
+                                        if (space.hasPiece() && (space.getPiece().isLight() != playerTurn())) canActivate = true;
+                                    }
+
+                                    if (canActivate) {
+                                        // If a highlighted space is clicked
+                                        if (attack.runAlgorithm(origin, internalBoard).contains(destination)) {
+                                            sideui.getFeed().printAction(getSelectedPiece().toString() + " uses " + attack.toString() + ", dealing " + attack.getVal() + " to every enemy in the area!", player1Turn);
+                                            // Iterate through every square in the attack algorithm
+                                            for (Square space : attack.runAlgorithm(origin, internalBoard)) {
+                                                if (space.hasPiece() && (space.getPiece().isLight() != playerTurn())) {
+                                                    Piece targetPiece = space.getPiece(); 
+                                                    targetPiece.takeDamage(attack.getVal());
+                                                    if (targetPiece.getCurrentHP() <= 0) {
+                                                        killPiece(targetPiece);
+                                                        sideui.getFeed().printAction(targetPiece.toString() + " has been slain.", player1Turn);
+                                                    }
                                                 }
                                             }
+
+                                            deselectAll();
+                                            switchPlayer();
+                                            switchTurn();
+                                            removeSkipButton();
+                                            sideui.getMenu().revertMenu(); 
                                         }
+                                    }
+                                    
+                                }
+                                // Regular attack handler
+                                else {
+                                    // If the destination has a piece, the piece is a different color, and the space is highlighted
+                                    if (destination.hasPiece() && (destination.getPiece().isLight() != playerTurn()) && attack.runAlgorithm(origin, internalBoard).contains(destination)) {
+                                        Piece targetPiece = destination.getPiece();
+                                        sideui.getFeed().printAction(getSelectedPiece().toString() + " uses " + attack.toString() + " on " + targetPiece.toString() + ", dealing " + attack.getVal() + " damage.", player1Turn);
+                                        targetPiece.takeDamage(sideui.getMenu().getSelectedSkill().getVal());
+                                        if (targetPiece.getCurrentHP() <= 0) {
+                                            killPiece(targetPiece);
+                                            sideui.getFeed().printAction(targetPiece.toString() + " has been slain.", player1Turn);
+                                        }
+
+            
+                                        deselectAll();
+                                        switchPlayer();
+                                        switchTurn();
+                                        removeSkipButton();
+                                        sideui.getMenu().revertMenu();
+                                    }
+                                }
+                            }
+
+                            // Spell handler
+                            else if (sideui.getMenu().getSelectedSkill() instanceof Spell) {
+                                Spell spell = (Spell) sideui.getMenu().getSelectedSkill();
+
+                                // Spell algorithms should specify only spaces with allies in their algorithms, so no need for rigorous checking here
+                                if (spell.runAlgorithm(origin, internalBoard).contains(destination)) {
+                                    Piece targetPiece = destination.getPiece();
+                                    // Only heal if its possible
+                                    if (targetPiece.getCurrentHP() != targetPiece.getMaxHP()) {
+                                        targetPiece.heal(spell.getVal());
+                                        sideui.getFeed().printAction(getSelectedPiece() + " heals " + targetPiece.toString() + " for " + spell.getVal() + " health. " + targetPiece.toString() + " is now at " + targetPiece.getCurrentHP() + " HP.", player1Turn);
 
                                         deselectAll();
                                         switchPlayer();
                                         switchTurn();
                                         removeSkipButton();
-                                        sideui.getMenu().revertMenu(); 
+                                        sideui.getMenu().revertMenu();
                                     }
                                 }
-                                
                             }
-                            // Regular attack handler
-                            else {
-                                // If the destination has a piece, the piece is a different color, and the space is highlighted
-                                if (destination.hasPiece() && (destination.getPiece().isLight() != playerTurn()) && attack.runAlgorithm(origin, internalBoard).contains(destination)) {
-                                    Piece targetPiece = destination.getPiece();
-                                    sideui.getFeed().printAction(getSelectedPiece().toString() + " uses " + attack.toString() + " on " + targetPiece.toString() + ", dealing " + attack.getVal() + " damage.", player1Turn);
-                                    targetPiece.takeDamage(sideui.getMenu().getSelectedSkill().getVal());
-                                    if (targetPiece.getCurrentHP() <= 0) {
-                                        killPiece(targetPiece);
-                                        sideui.getFeed().printAction(targetPiece.toString() + " has been slain.", player1Turn);
-                                    }
 
-          
-                                    deselectAll();
-                                    switchPlayer();
-                                    switchTurn();
-                                    removeSkipButton();
-                                    sideui.getMenu().revertMenu();
-                                }
-                            }
-                        }
+                            // Last resort handler
+                            else if (sideui.getMenu().getSelectedSkill() instanceof LastResort) {
+                                LastResort lastResort = (LastResort) sideui.getMenu().getSelectedSkill();
 
-                        // Spell handler
-                        else if (sideui.getMenu().getSelectedSkill() instanceof Spell) {
-                            Spell spell = (Spell) sideui.getMenu().getSelectedSkill();
+                                if (lastResort.runAlgorithm(origin, internalBoard).contains(destination)) {
 
-                            // Spell algorithms should specify only spaces with allies in their algorithms, so no need for rigorous checking here
-                            if (spell.runAlgorithm(origin, internalBoard).contains(destination)) {
-                                Piece targetPiece = destination.getPiece();
-                                // Only heal if its possible
-                                if (targetPiece.getCurrentHP() != targetPiece.getMaxHP()) {
-                                    targetPiece.heal(spell.getVal());
-                                    sideui.getFeed().printAction(getSelectedPiece() + " heals " + targetPiece.toString() + " for " + spell.getVal() + " health. " + targetPiece.toString() + " is now at " + targetPiece.getCurrentHP() + " HP.", player1Turn);
-
-                                    deselectAll();
-                                    switchPlayer();
-                                    switchTurn();
-                                    removeSkipButton();
-                                    sideui.getMenu().revertMenu();
-                                }
-                            }
-                        }
-
-                        // Last resort handler
-                        else if (sideui.getMenu().getSelectedSkill() instanceof LastResort) {
-                            LastResort lastResort = (LastResort) sideui.getMenu().getSelectedSkill();
-
-                            if (lastResort.runAlgorithm(origin, internalBoard).contains(destination)) {
-
-                                // Finding the king that casted the spell
-                                King king = null;
-                                for (Square[] row : internalBoard) {
-                                    for (Square space : row) {
-                                        if (space.hasPiece() && (space.getPiece() instanceof King) && (space.getPiece().isLight() == playerTurn())) {
-                                            king = (King) space.getPiece();
+                                    // Finding the king that casted the spell
+                                    King king = null;
+                                    for (Square[] row : internalBoard) {
+                                        for (Square space : row) {
+                                            if (space.hasPiece() && (space.getPiece() instanceof King) && (space.getPiece().isLight() == playerTurn())) {
+                                                king = (King) space.getPiece();
+                                            }
                                         }
                                     }
-                                }
 
-                                // Only run command if the king can heal any HP
-                                if (king.getCurrentHP() != king.getMaxHP()) {
-                                    Piece sacrifice = destination.getPiece();
-                                    int HP = sacrifice.getCurrentHP();
-                                    killPiece(sacrifice);
-                                    king.heal(HP);
-                                    sideui.getFeed().printAction(king.toString() + " uses the Last Resort, and sacrifices " + sacrifice.toString() + "! " + king.toString() + " heals to " + king.getCurrentHP() + " HP.", player1Turn);
-                                        
-                                    deselectAll();
-                                    switchPlayer();
-                                    switchTurn();
-                                    removeSkipButton();
-                                    sideui.getMenu().revertMenu();
-                                }
+                                    // Only run command if the king can heal any HP
+                                    if (king.getCurrentHP() != king.getMaxHP()) {
+                                        Piece sacrifice = destination.getPiece();
+                                        int HP = sacrifice.getCurrentHP();
+                                        killPiece(sacrifice);
+                                        king.heal(HP);
+                                        sideui.getFeed().printAction(king.toString() + " uses the Last Resort, and sacrifices " + sacrifice.toString() + "! " + king.toString() + " heals to " + king.getCurrentHP() + " HP.", player1Turn);
+                                            
+                                        deselectAll();
+                                        switchPlayer();
+                                        switchTurn();
+                                        removeSkipButton();
+                                        sideui.getMenu().revertMenu();
+                                    }
 
+                                }
                             }
-                        }
-                        
-                    }
-
-                    // If piece is clicked
-                    else if (target instanceof Piece) {
-                        Piece targetPiece = (Piece) target;
-                        Square destination = (Square) targetPiece.getParent();
-                        Square origin = getSelectedPiece().getSpace();
-                        // Deselect if same piece is clicked
-                        if (targetPiece == getSelectedPiece()) {
-                            deselectAll();
-                            sideui.getMenu().revertMenu();
+                            
                         }
 
-                        // Attack handler
-                        if (sideui.getMenu().getSelectedSkill() instanceof Attack) {
-                            Attack attack = (Attack) sideui.getMenu().getSelectedSkill();
-                            // Aoe attack handler
-                            if (attack.aoe()) {
+                        // If piece is clicked
+                        else if (target instanceof Piece) {
+                            Piece targetPiece = (Piece) target;
+                            Square destination = (Square) targetPiece.getParent();
+                            Square origin = getSelectedPiece().getSpace();
+                            // Deselect if same piece is clicked
+                            if (targetPiece == getSelectedPiece()) {
+                                deselectAll();
+                                sideui.getMenu().revertMenu();
+                            }
 
-                                // Check if it can be used (only activate if there's an enemy in the area)
-                                boolean canActivate = false;
-                                for (Square space : attack.runAlgorithm(origin, internalBoard)) {
-                                    if (space.hasPiece() && space.getPiece().isLight() != playerTurn()) canActivate = true;
-                                }
+                            // Attack handler
+                            if (sideui.getMenu().getSelectedSkill() instanceof Attack) {
+                                Attack attack = (Attack) sideui.getMenu().getSelectedSkill();
+                                // Aoe attack handler
+                                if (attack.aoe()) {
 
-                                if (canActivate) {
-                                    // If a highlighted space is clicked
-                                    if (attack.runAlgorithm(origin, internalBoard).contains(destination)) {
-                                        sideui.getFeed().printAction(getSelectedPiece().toString() + " uses " + attack.toString() + ", dealing " + attack.getVal() + " to every enemy in the area!", player1Turn);
-                                        // Iterate through every square in the attack algorithm
-                                        for (Square space : attack.runAlgorithm(origin, internalBoard)) {
-                                            if (space.hasPiece() && (space.getPiece().isLight() != playerTurn())) {
-                                                Piece aoeTargetPiece = space.getPiece(); 
-                                                aoeTargetPiece.takeDamage(attack.getVal());
-                                                if (aoeTargetPiece.getCurrentHP() <= 0) {
-                                                    killPiece(aoeTargetPiece);
-                                                    sideui.getFeed().printAction(targetPiece.toString() + " has been slain.", player1Turn);
+                                    // Check if it can be used (only activate if there's an enemy in the area)
+                                    boolean canActivate = false;
+                                    for (Square space : attack.runAlgorithm(origin, internalBoard)) {
+                                        if (space.hasPiece() && space.getPiece().isLight() != playerTurn()) canActivate = true;
+                                    }
+
+                                    if (canActivate) {
+                                        // If a highlighted space is clicked
+                                        if (attack.runAlgorithm(origin, internalBoard).contains(destination)) {
+                                            sideui.getFeed().printAction(getSelectedPiece().toString() + " uses " + attack.toString() + ", dealing " + attack.getVal() + " to every enemy in the area!", player1Turn);
+                                            // Iterate through every square in the attack algorithm
+                                            for (Square space : attack.runAlgorithm(origin, internalBoard)) {
+                                                if (space.hasPiece() && (space.getPiece().isLight() != playerTurn())) {
+                                                    Piece aoeTargetPiece = space.getPiece(); 
+                                                    aoeTargetPiece.takeDamage(attack.getVal());
+                                                    if (aoeTargetPiece.getCurrentHP() <= 0) {
+                                                        killPiece(aoeTargetPiece);
+                                                        sideui.getFeed().printAction(targetPiece.toString() + " has been slain.", player1Turn);
+                                                    }
                                                 }
-                                            }
-                                        } 
-                                                                                                            
+                                            } 
+                                                                                                                
+                                            deselectAll();
+                                            switchPlayer();
+                                            switchTurn();
+                                            removeSkipButton();
+                                            sideui.getMenu().revertMenu();
+                                        }
+                                    }
+
+                                }
+                                // Regular attack handler
+                                else {
+                                    // If the destination has a piece, the piece is a different color, and the space is highlighted
+                                    if (destination.hasPiece() && (destination.getPiece().isLight() != playerTurn()) && attack.runAlgorithm(origin, internalBoard).contains(destination)) {
+                                        sideui.getFeed().printAction(getSelectedPiece().toString() + " uses " + attack.toString() + " on " + targetPiece.toString() + ", dealing " + attack.getVal() + " damage.", player1Turn);
+                                        targetPiece.takeDamage(sideui.getMenu().getSelectedSkill().getVal());
+                                        if (targetPiece.getCurrentHP() <= 0) {
+                                            killPiece(targetPiece);
+                                            sideui.getFeed().printAction(targetPiece.toString() + " has been slain.", player1Turn);
+                                        }
+                                        
                                         deselectAll();
                                         switchPlayer();
                                         switchTurn();
@@ -576,87 +600,70 @@ public class Chessboard extends VBox {
                                 }
 
                             }
-                            // Regular attack handler
-                            else {
-                                // If the destination has a piece, the piece is a different color, and the space is highlighted
-                                if (destination.hasPiece() && (destination.getPiece().isLight() != playerTurn()) && attack.runAlgorithm(origin, internalBoard).contains(destination)) {
-                                    sideui.getFeed().printAction(getSelectedPiece().toString() + " uses " + attack.toString() + " on " + targetPiece.toString() + ", dealing " + attack.getVal() + " damage.", player1Turn);
-                                    targetPiece.takeDamage(sideui.getMenu().getSelectedSkill().getVal());
-                                    if (targetPiece.getCurrentHP() <= 0) {
-                                        killPiece(targetPiece);
-                                        sideui.getFeed().printAction(targetPiece.toString() + " has been slain.", player1Turn);
+
+                            // Spell handler
+                            else if (sideui.getMenu().getSelectedSkill() instanceof Spell) {
+                                Spell spell = (Spell) sideui.getMenu().getSelectedSkill();
+
+                                // Spell algorithms should specify only spaces with allies in their algorithms, so no need for rigorous checking here
+                                if (spell.runAlgorithm(origin, internalBoard).contains(destination)) {
+                                    // Only heal if its possible
+                                    if (targetPiece.getCurrentHP() != targetPiece.getMaxHP()) {
+                                        sideui.getFeed().printAction(getSelectedPiece() + " heals " + targetPiece.toString() + " for " + spell.getVal() + " health. " + targetPiece.toString() + " is now at " + targetPiece.getCurrentHP() + " HP.", player1Turn);
+                                        targetPiece.heal(spell.getVal());
+
+                                        deselectAll();
+                                        switchPlayer();
+                                        switchTurn();
+                                        removeSkipButton();
+                                        sideui.getMenu().revertMenu();
                                     }
-                                    
-                                    deselectAll();
-                                    switchPlayer();
-                                    switchTurn();
-                                    removeSkipButton();
-                                    sideui.getMenu().revertMenu();
                                 }
                             }
 
-                        }
+                            // Last resort handler
+                            else if (sideui.getMenu().getSelectedSkill() instanceof LastResort) {
+                                LastResort lastResort = (LastResort) sideui.getMenu().getSelectedSkill();
 
-                        // Spell handler
-                        else if (sideui.getMenu().getSelectedSkill() instanceof Spell) {
-                            Spell spell = (Spell) sideui.getMenu().getSelectedSkill();
+                                if (lastResort.runAlgorithm(origin, internalBoard).contains(destination)) {
 
-                            // Spell algorithms should specify only spaces with allies in their algorithms, so no need for rigorous checking here
-                            if (spell.runAlgorithm(origin, internalBoard).contains(destination)) {
-                                // Only heal if its possible
-                                if (targetPiece.getCurrentHP() != targetPiece.getMaxHP()) {
-                                    sideui.getFeed().printAction(getSelectedPiece() + " heals " + targetPiece.toString() + " for " + spell.getVal() + " health. " + targetPiece.toString() + " is now at " + targetPiece.getCurrentHP() + " HP.", player1Turn);
-                                    targetPiece.heal(spell.getVal());
-
-                                    deselectAll();
-                                    switchPlayer();
-                                    switchTurn();
-                                    removeSkipButton();
-                                    sideui.getMenu().revertMenu();
-                                }
-                            }
-                        }
-
-                        // Last resort handler
-                        else if (sideui.getMenu().getSelectedSkill() instanceof LastResort) {
-                            LastResort lastResort = (LastResort) sideui.getMenu().getSelectedSkill();
-
-                            if (lastResort.runAlgorithm(origin, internalBoard).contains(destination)) {
-
-                                // Finding the king that casted the spell
-                                King king = null;
-                                for (Square[] row : internalBoard) {
-                                    for (Square space : row) {
-                                        if (space.hasPiece() && (space.getPiece() instanceof King) && (space.getPiece().isLight() == playerTurn())) {
-                                            king = (King) space.getPiece();
+                                    // Finding the king that casted the spell
+                                    King king = null;
+                                    for (Square[] row : internalBoard) {
+                                        for (Square space : row) {
+                                            if (space.hasPiece() && (space.getPiece() instanceof King) && (space.getPiece().isLight() == playerTurn())) {
+                                                king = (King) space.getPiece();
+                                            }
                                         }
                                     }
-                                }
 
-                                // Only run command if the king can heal any HP
-                                if (king.getCurrentHP() != king.getMaxHP()) {
-                                    Piece sacrifice = destination.getPiece();
-                                    int HP = sacrifice.getCurrentHP();
-                                    killPiece(sacrifice);
-                                    king.heal(HP);
-                                    sideui.getFeed().printAction(king.toString() + " uses the Last Resort, and sacrifices " + sacrifice.toString() + "! " + king.toString() + " heals to " + king.getCurrentHP() + " HP.", player1Turn);
-                                        
-                                    deselectAll();
-                                    switchPlayer();
-                                    switchTurn();
-                                    removeSkipButton();
-                                    sideui.getMenu().revertMenu();
-                                }
+                                    // Only run command if the king can heal any HP
+                                    if (king.getCurrentHP() != king.getMaxHP()) {
+                                        Piece sacrifice = destination.getPiece();
+                                        int HP = sacrifice.getCurrentHP();
+                                        killPiece(sacrifice);
+                                        king.heal(HP);
+                                        sideui.getFeed().printAction(king.toString() + " uses the Last Resort, and sacrifices " + sacrifice.toString() + "! " + king.toString() + " heals to " + king.getCurrentHP() + " HP.", player1Turn);
+                                            
+                                        deselectAll();
+                                        switchPlayer();
+                                        switchTurn();
+                                        removeSkipButton();
+                                        sideui.getMenu().revertMenu();
+                                    }
 
+                                }
                             }
+                            
+                            
                         }
-                        
-                        
+
                     }
 
                 }
-
             }
+
+            
 
         }
     };
